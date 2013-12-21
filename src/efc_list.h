@@ -70,6 +70,7 @@
 #define EFC_LIST_H_
 
 #include <list>
+#include <cstddef>
 #include <platform/utils.h>
 #include <efc/type_traits>
 
@@ -473,7 +474,7 @@ public:
      *  current size the %List is truncated, otherwise default
      *  constructed elements are appended.
      */
-    void resize(size_type new_size);
+    WARN_UNUSED_RETURN bool resize(size_type new_size);
 
     /**
      *  @brief Resizes the %List to the specified number of elements.
@@ -485,7 +486,7 @@ public:
      *  current size the %List is truncated, otherwise the %List is
      *  extended and new elements are populated with given data.
      */
-    void resize(size_type new_size, const value_type &x);
+    WARN_UNUSED_RETURN bool resize(size_type new_size, const value_type &x);
 #else
     /**
      *  @brief Resizes the %List to the specified number of elements.
@@ -497,7 +498,7 @@ public:
      *  current size the %List is truncated, otherwise the %List is
      *  extended and new elements are populated with given data.
      */
-    void resize(size_type new_size, value_type x = value_type());
+    WARN_UNUSED_RETURN bool resize(size_type new_size, value_type x = value_type());
 #endif
 
     // element access
@@ -529,6 +530,7 @@ public:
     /**
      *  @brief  Add data to the front of the %List.
      *  @param  x  Data to be added.
+     *  @return  @c TRUE if Node was pushed into list.
      *
      *  This is a typical stack operation.  The function creates an
      *  element at the front of the %List and assigns the given data
@@ -536,13 +538,13 @@ public:
      *  done in constant time, and does not invalidate iterators and
      *  references.
      */
-    void push_front(const value_type &x);
+    WARN_UNUSED_RETURN bool push_front(const value_type &x);
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
-    void push_front(value_type &&x);
+    WARN_UNUSED_RETURN bool push_front(value_type &&x);
 
     template<typename... Args>
-    void emplace_front(Args &&... args);
+    WARN_UNUSED_RETURN bool emplace_front(Args &&... args);
 #endif
 
     /**
@@ -569,13 +571,13 @@ public:
      *  in constant time, and does not invalidate iterators and
      *  references.
      */
-    void push_back(const value_type &x);
+    WARN_UNUSED_RETURN bool push_back(const value_type &x);
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
-    void push_back(value_type &&x);
+    WARN_UNUSED_RETURN bool push_back(value_type &&x);
 
     template<typename... Args>
-    void emplace_back(Args &&... args);
+    WARN_UNUSED_RETURN bool emplace_back(Args &&... args);
 #endif
 
     /**
@@ -648,7 +650,7 @@ public:
      *  This operation is linear in the number of elements inserted and
      *  does not invalidate iterators and references.
      */
-    void insert(iterator p, std::initializer_list<value_type> l);
+    WARN_UNUSED_RETURN bool insert(iterator p, std::initializer_list<value_type> l);
 #endif
 
     /**
@@ -663,7 +665,7 @@ public:
      *  This operation is linear in the number of elements inserted and
      *  does not invalidate iterators and references.
      */
-    void insert(iterator position, size_type n, const value_type &x);
+    WARN_UNUSED_RETURN bool insert(iterator position, size_type n, const value_type &x);
 
     /**
      *  @brief  Inserts a range into the %List.
@@ -679,7 +681,7 @@ public:
      *  does not invalidate iterators and references.
      */
     template<typename InputIterator>
-    void insert(iterator position, InputIterator first, InputIterator last);
+    WARN_UNUSED_RETURN bool insert(iterator position, InputIterator first, InputIterator last);
 
     /**
      *  @brief  Remove element at given position.
@@ -972,7 +974,7 @@ protected:
      */
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
     template<typename ... Args>
-    Node *_M_create_node(Args &&... args)
+    WARN_UNUSED_RETURN Node *create_node(Args &&... args)
     {
         Node *p = m_allocator.allocate(1);
 
@@ -989,13 +991,13 @@ protected:
         return p;
     }
 #else
-    Node *_M_create_node(const value_type &x)
+    WARN_UNUSED_RETURN Node *create_node(const value_type &x)
     {
         Node *p = m_allocator.allocate(1);
 
         PLATFORM_TRY
         {
-            m_allocator.construct(std::addressof(p->data), x);
+            m_allocator.construct(&p->data, x);
         }
         PLATFORM_CATCH(...)
         {
@@ -1015,37 +1017,49 @@ protected:
     // _GLIBCXX_RESOLVE_LIB_DEFECTS
     // 438. Ambiguity in the "do the right thing" clause
     template<typename Integer>
-    void _M_initialize_dispatch(Integer n, Integer x, bool_value<true>)
+    void initialize_dispatch(Integer n, Integer x, bool_value<true>)
     {
-        _M_fill_initialize(static_cast<size_type>(n), x);
+        fill_initialize(static_cast<size_type>(n), x);
     }
 
     // Called by the range constructor to implement [23.1.1]/9
     template<typename InputIterator>
-    void _M_initialize_dispatch(InputIterator first, InputIterator last, bool_value<false>)
+    void initialize_dispatch(InputIterator first, InputIterator last, bool_value<false>)
     {
         for (; first != last; ++first)
-            push_back(*first);
+            if (UNLIKELY(push_back(*first) == false))
+            {
+                clear();
+                return;
+            }
     }
 
     // Called by list(n,v,a), and the range constructor when it turns out
     // to be the same thing.
-    void _M_fill_initialize(size_type n, const value_type& x)
+    void fill_initialize(size_type n, const value_type &x)
     {
         for (; n; --n)
-            push_back(x);
+            if (UNLIKELY(push_back(x) == false))
+            {
+                clear();
+                return;
+            }
     }
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
     // Called by list(n).
-    void _M_default_initialize(size_type n)
+    void default_initialize(size_type n)
     {
         for (; n; --n)
-            emplace_back();
+            if (UNLIKELY(emplace_back() == false))
+            {
+                clear();
+                return;
+            }
     }
 
     // Called by resize(sz).
-    void _M_default_append(size_type n);
+    WARN_UNUSED_RETURN bool default_append(size_type n);
 #endif
 
     // Internal assign functions follow.
@@ -1055,48 +1069,58 @@ protected:
     // _GLIBCXX_RESOLVE_LIB_DEFECTS
     // 438. Ambiguity in the "do the right thing" clause
     template<typename Integer>
-    void _M_assign_dispatch(Integer n, Integer val, bool_value<true>)
+    void assign_dispatch(Integer n, Integer val, bool_value<true>)
     {
-        _M_fill_assign(n, val);
+        fill_assign(n, val);
     }
 
     // Called by the range assign to implement [23.1.1]/9
     template<typename InputIterator>
-    void _M_assign_dispatch(InputIterator first, InputIterator last, bool_value<false>);
+    void assign_dispatch(InputIterator first, InputIterator last, bool_value<false>);
 
     // Called by assign(n,t), and the range assign when it turns out
     // to be the same thing.
-    void _M_fill_assign(size_type n, const value_type& val);
-
+    WARN_UNUSED_RETURN bool fill_assign(size_type n, const value_type &val);
 
     // Moves the elements from [first,last) before position.
-    void _M_transfer(iterator position, iterator first, iterator last)
+    void transfer(iterator position, iterator first, iterator last)
     {
-        position.node->_M_transfer(first.node, last.node);
+        position.node->transfer(first.node, last.node);
     }
 
     // Inserts new element at position given and with value given.
-#if !PLATFORM_COMPILER_SUPPORTS(CXX11)
-    void
-    _M_insert(iterator position, const value_type& x)
+#if PLATFORM_COMPILER_SUPPORTS(CXX11)
+    template<typename... _Args>
+    WARN_UNUSED_RETURN bool internal_insert(iterator position, _Args &&... args)
     {
-        Node* tmp = _M_create_node(x);
-        tmp->_M_hook(position._M_node);
+        Node *tmp = create_node(std::forward<_Args>(args)...);
+
+        if (LIKELY(tmp != NULL))
+            tmp->hook(position.node);
+        else
+            return false;
+
+        return true;
     }
 #else
-    template<typename... _Args>
-    void _M_insert(iterator position, _Args &&... args)
+    WARN_UNUSED_RETURN bool internal_insert(iterator position, const value_type &x)
     {
-        Node* tmp = _M_create_node(std::forward<_Args>(args)...);
-        tmp->hook(position.node);
+        Node *tmp = create_node(x);
+
+        if (LIKELY(tmp != NULL))
+            tmp->hook(position.node);
+        else
+            return false;
+
+        return true;
     }
 #endif
 
     // Erases element at position given.
-    void _M_erase(iterator position)
+    void internal_erase(iterator position)
     {
         position.node->unhook();
-        Node* n = static_cast<Node *>(position.node);
+        Node *n = static_cast<Node *>(position.node);
 
         m_allocator.destroy(n);
         m_allocator.deallocate(n, 1);
@@ -1113,9 +1137,6 @@ private:
     NodeBase m_node;
     Node_alloc_type m_allocator;
 };
-
-
-/*---------------------------IMPLEMENTATION---------------------------*/
 
 
 template<typename T, typename Allocator>
@@ -1143,28 +1164,32 @@ List<T, Allocator>::List(List &&x) :
 template<typename T, typename Allocator>
 List<T, Allocator>::List(size_type n)
 {
-    _M_default_initialize(n);
+    init();
+    default_initialize(n);
 }
 
 template<typename T, typename Allocator>
 List<T, Allocator>::List(size_type n, const value_type &value, const Allocator &a) :
     m_allocator(Node_alloc_type(a))
 {
-    _M_fill_initialize(n, value);
+    init();
+    fill_initialize(n, value);
 }
 
 template<typename T, typename Allocator>
 List<T, Allocator>::List(std::initializer_list<value_type> l, const Allocator &a) :
     m_allocator(Node_alloc_type(a))
 {
-    _M_initialize_dispatch(l.begin(), l.end(), bool_value<false>());
+    init();
+    initialize_dispatch(l.begin(), l.end(), bool_value<false>());
 }
 #else
 template<typename T, typename Allocator>
 List<T, Allocator>::List(size_type n, const value_type &value = value_type(), const Allocator &a) :
     m_allocator(Node_alloc_type(a))
 {
-    _M_fill_initialize(n, value);
+    init();
+    fill_initialize(n, value);
 }
 #endif
 
@@ -1172,7 +1197,8 @@ template<typename T, typename Allocator>
 List<T, Allocator>::List(const List &x) :
     m_allocator(x.m_allocator)
 {
-    _M_initialize_dispatch(x.begin(), x.end(), bool_value<false>());
+    init();
+    initialize_dispatch(x.begin(), x.end(), bool_value<false>());
 }
 
 template<typename T, typename Allocator>
@@ -1180,9 +1206,11 @@ template<typename InputIterator>
 List<T, Allocator>::List(InputIterator first, InputIterator last, const Allocator &a) :
     m_allocator(Node_alloc_type(a))
 {
+    init();
+
     // Check whether it's an integral type.  If so, it's not an iterator.
     typedef typename is_integer<InputIterator>::type Integral;
-    _M_initialize_dispatch(first, last, Integral());
+    initialize_dispatch(first, last, Integral());
 }
 
 template<typename T, typename Allocator>
@@ -1207,7 +1235,11 @@ List<T, Allocator> &List<T, Allocator>::operator=(const List &x)
         if (first2 == last2)
             erase(first1, last1);
         else
+        {
+            WARN_UNUSED_RETURN_OFF
             insert(last1, first2, last2);
+            WARN_UNUSED_RETURN_ON
+        }
     }
 
     return *this;
@@ -1233,7 +1265,7 @@ List<T, Allocator> &List<T, Allocator>::operator=(std::initializer_list<value_ty
 template<typename T, typename Allocator>
 void List<T, Allocator>::assign(size_type n, const value_type &val)
 {
-    _M_fill_assign(n, val);
+    fill_assign(n, val);
 }
 
 template<typename T, typename Allocator>
@@ -1242,7 +1274,7 @@ void List<T, Allocator>::assign(InputIterator first, InputIterator last)
 {
     // Check whether it's an integral type.  If so, it's not an iterator.
     typedef typename is_integer<InputIterator>::type Integral;
-    _M_assign_dispatch(first, last, Integral());
+    assign_dispatch(first, last, Integral());
 }
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
@@ -1347,7 +1379,7 @@ typename List<T, Allocator>::size_type List<T, Allocator>::max_size() const
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
 template<typename T, typename Allocator>
-void List<T, Allocator>::resize(size_type new_size)
+bool List<T, Allocator>::resize(size_type new_size)
 {
     iterator i = begin();
     size_type len = 0;
@@ -1357,11 +1389,13 @@ void List<T, Allocator>::resize(size_type new_size)
     if (len == new_size)
         erase(i, end());
     else // i == end()
-        _M_default_append(new_size - len);
+        return default_append(new_size - len);
+
+    return true;
 }
 
 template<typename T, typename Allocator>
-void List<T, Allocator>::resize(size_type new_size, const value_type &x)
+bool List<T, Allocator>::resize(size_type new_size, const value_type &x)
 {
     iterator i = begin();
     size_type len = 0;
@@ -1371,11 +1405,13 @@ void List<T, Allocator>::resize(size_type new_size, const value_type &x)
     if (len == new_size)
         erase(i, end());
     else // i == end()
-        insert(end(), new_size - len, x);
+        return insert(end(), new_size - len, x);
+
+    return true;
 }
 #else
 template<typename T, typename Allocator>
-void List<T, Allocator>::resize(size_type new_size, value_type x)
+bool List<T, Allocator>::resize(size_type new_size, value_type x)
 {
     iterator i = begin();
     size_type len = 0;
@@ -1384,8 +1420,10 @@ void List<T, Allocator>::resize(size_type new_size, value_type x)
 
     if (len == new_size)
         erase(i, end());
-    else                          // i == end()
-        insert(end(), new_size - len, x);
+    else // i == end()
+        return insert(end(), new_size - len, x);
+
+    return true;
 }
 #endif
 
@@ -1404,71 +1442,67 @@ typename List<T, Allocator>::const_reference List<T, Allocator>::front() const
 template<typename T, typename Allocator>
 typename List<T, Allocator>::reference List<T, Allocator>::back()
 {
-    iterator tmp = end();
-    --tmp;
-    return *tmp;
+    return *(--end());
 }
 
 template<typename T, typename Allocator>
 typename List<T, Allocator>::const_reference List<T, Allocator>::back() const
 {
-    const_iterator tmp = end();
-    --tmp;
-    return *tmp;
+    return *(--end());
 }
 
 template<typename T, typename Allocator>
-void List<T, Allocator>::push_front(const value_type &x)
+bool List<T, Allocator>::push_front(const value_type &x)
 {
-    _M_insert(begin(), x);
+    return internal_insert(begin(), x);
 }
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
 template<typename T, typename Allocator>
-void List<T, Allocator>::push_front(value_type &&x)
+bool List<T, Allocator>::push_front(value_type &&x)
 {
-    _M_insert(begin(), std::move(x));
+    return internal_insert(begin(), std::move(x));
 }
 
 template<typename T, typename Allocator>
 template<typename... Args>
-void List<T, Allocator>::emplace_front(Args &&... args)
+bool List<T, Allocator>::emplace_front(Args &&... args)
 {
-    _M_insert(begin(), std::forward<Args>(args)...);
+    return internal_insert(begin(), std::forward<Args>(args)...);
 }
 #endif
 
 template<typename T, typename Allocator>
 void List<T, Allocator>::pop_front()
 {
-    _M_erase(begin());
+    internal_erase(begin());
 }
 
 template<typename T, typename Allocator>
-void List<T, Allocator>::push_back(const value_type &x)
+bool List<T, Allocator>::push_back(const value_type &x)
 {
-    _M_insert(end(), x);
+    return internal_insert(end(), x);
 }
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
 template<typename T, typename Allocator>
-void List<T, Allocator>::push_back(value_type &&x)
+bool List<T, Allocator>::push_back(value_type &&x)
 {
-    _M_insert(end(), std::move(x));
+    return internal_insert(end(), std::move(x));
 }
 
 template<typename T, typename Allocator>
 template<typename... Args>
-void List<T, Allocator>::emplace_back(Args &&... args)
+bool List<T, Allocator>::emplace_back(Args &&... args)
 {
-    _M_insert(end(), std::forward<Args>(args)...);
+    return internal_insert(end(), std::forward<Args>(args)...);
 }
 #endif
 
 template<typename T, typename Allocator>
 void List<T, Allocator>::pop_back()
 {
-    _M_erase(iterator(m_node.prev));
+    internal_erase(iterator(m_node.prev));
 }
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
@@ -1476,18 +1510,30 @@ template<typename T, typename Allocator>
 template<typename... Args>
 typename List<T, Allocator>::iterator List<T, Allocator>::emplace(iterator position, Args &&... args)
 {
-    Node *tmp = _M_create_node(std::forward<Args>(args)...);
-    tmp->hook(position.node);
-    return iterator(tmp);
+    Node *tmp = create_node(std::forward<Args>(args)...);
+
+    if (LIKELY(tmp != NULL))
+    {
+        tmp->hook(position.node);
+        return iterator(tmp);
+    }
+
+    return end();
 }
 #endif
 
 template<typename T, typename Allocator>
 typename List<T, Allocator>::iterator List<T, Allocator>::insert(iterator position, const value_type &x)
 {
-    Node *tmp = _M_create_node(x);
-    tmp->hook(position.node);
-    return iterator(tmp);
+    Node *tmp = create_node(x);
+
+    if (LIKELY(tmp != NULL))
+    {
+        tmp->hook(position.node);
+        return iterator(tmp);
+    }
+
+    return end();
 }
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
@@ -1498,32 +1544,44 @@ typename List<T, Allocator>::iterator List<T, Allocator>::insert(iterator positi
 }
 
 template<typename T, typename Allocator>
-void List<T, Allocator>::insert(iterator p, std::initializer_list<value_type> l)
+bool List<T, Allocator>::insert(iterator p, std::initializer_list<value_type> l)
 {
-    insert(p, l.begin(), l.end());
+    return insert(p, l.begin(), l.end());
 }
 #endif
 
 template<typename T, typename Allocator>
-void List<T, Allocator>::insert(iterator position, size_type n, const value_type &x)
+bool List<T, Allocator>::insert(iterator position, size_type n, const value_type &x)
 {
     List<T, Allocator> tmp(n, x, m_allocator);
-    splice(position, tmp);
+
+    if (UNLIKELY(tmp.empty() == true))
+        return false;
+    else
+        splice(position, tmp);
+
+    return true;
 }
 
 template<typename T, typename Allocator>
 template<typename InputIterator>
-void List<T, Allocator>::insert(iterator position, InputIterator first, InputIterator last)
+bool List<T, Allocator>::insert(iterator position, InputIterator first, InputIterator last)
 {
     List<T, Allocator> tmp(first, last, m_allocator);
-    splice(position, tmp);
+
+    if (UNLIKELY(tmp.empty() == true))
+        return false;
+    else
+        splice(position, tmp);
+
+    return true;
 }
 
 template<typename T, typename Allocator>
 typename List<T, Allocator>::iterator List<T, Allocator>::erase(iterator position)
 {
     iterator ret = iterator(position.node->next);
-    _M_erase(position);
+    internal_erase(position);
     return ret;
 }
 
@@ -1565,7 +1623,7 @@ List<T, Allocator>::splice(iterator position, List &x)
     {
         _M_check_equal_allocators(x);
 
-        _M_transfer(position, x.begin(), x.end());
+        transfer(position, x.begin(), x.end());
     }
 }
 
@@ -1594,7 +1652,7 @@ List<T, Allocator>::splice(iterator position, List &x, iterator i)
     if (this != &x)
         _M_check_equal_allocators(x);
 
-    _M_transfer(position, i, j);
+    transfer(position, i, j);
 }
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
@@ -1618,7 +1676,7 @@ List<T, Allocator>::splice(iterator position, List &x, iterator first, iterator 
         if (this != &x)
             _M_check_equal_allocators(x);
 
-        _M_transfer(position, first, last);
+        transfer(position, first, last);
     }
 }
 
@@ -1647,8 +1705,8 @@ void List<T, Allocator>::remove(const T &value)
             // _GLIBCXX_RESOLVE_LIB_DEFECTS
             // 526. Is it undefined if a function in the standard changes
             // in parameters?
-            if (std::addressof(*first) != std::addressof(value))
-                _M_erase(first);
+            if (&(*first) != &(value))
+                internal_erase(first);
             else
                 extra = first;
         }
@@ -1657,7 +1715,7 @@ void List<T, Allocator>::remove(const T &value)
     }
 
     if (extra != last)
-        _M_erase(extra);
+        internal_erase(extra);
 }
 
 template<typename T, typename Allocator>
@@ -1673,7 +1731,7 @@ void List<T, Allocator>::remove_if(Predicate pred)
         ++next;
 
         if (pred(*first))
-            _M_erase(first);
+            internal_erase(first);
 
         first = next;
     }
@@ -1693,7 +1751,7 @@ void List<T, Allocator>::unique()
     while (++next != last)
     {
         if (*first == *next)
-            _M_erase(next);
+            internal_erase(next);
         else
             first = next;
 
@@ -1716,7 +1774,7 @@ void List<T, Allocator>::unique(BinaryPredicate binary_pred)
     while (++next != last)
     {
         if (binary_pred(*first, *next))
-            _M_erase(next);
+            internal_erase(next);
         else
             first = next;
 
@@ -1753,14 +1811,14 @@ void List<T, Allocator>::merge(List &x)
             if (*first2 < *first1)
             {
                 iterator next = first2;
-                _M_transfer(first1, first2, ++next);
+                transfer(first1, first2, ++next);
                 first2 = next;
             }
             else
                 ++first1;
 
         if (first2 != last2)
-            _M_transfer(last1, first2, last2);
+            transfer(last1, first2, last2);
     }
 }
 
@@ -1796,14 +1854,14 @@ void List<T, Allocator>::merge(List &x, StrictWeakOrdering comp)
             if (comp(*first2, *first1))
             {
                 iterator next = first2;
-                _M_transfer(first1, first2, ++next);
+                transfer(first1, first2, ++next);
                 first2 = next;
             }
             else
                 ++first1;
 
         if (first2 != last2)
-            _M_transfer(last1, first2, last2);
+            transfer(last1, first2, last2);
     }
 }
 
@@ -1907,6 +1965,48 @@ void List<T, Allocator>::internal_clear()
 }
 
 template<typename T, typename Allocator>
+bool List<T, Allocator>::default_append(size_type n)
+{
+    size_type i = 0;
+
+    PLATFORM_TRY
+    {
+        for (; i < n; ++i)
+            if (UNLIKELY(emplace_back() == false))
+            {
+                clear();
+                return false;
+            }
+    }
+    PLATFORM_CATCH(...)
+    {
+        for (; i; --i)
+            pop_back();
+
+        PLATFORM_RETHROW;
+        return false;
+    }
+
+    return true;
+}
+
+template<typename T, typename Allocator>
+bool List<T, Allocator>::fill_assign(size_type n, const value_type &val)
+{
+    iterator i = begin();
+
+    for (; i != end() && n > 0; ++i, --n)
+        *i = val;
+
+    if (n > 0)
+        return insert(end(), n, val);
+    else
+        erase(i, end());
+
+    return true;
+}
+
+template<typename T, typename Allocator>
 void List<T, Allocator>::NodeBase::swap(NodeBase &x, NodeBase &y)
 {
     if (x.next != &x)
@@ -1959,7 +2059,7 @@ void List<T, Allocator>::NodeBase::transfer(NodeBase * const first, NodeBase * c
 template<typename T, typename Allocator>
 void List<T, Allocator>::NodeBase::reverse()
 {
-    NodeBase* tmp = this;
+    NodeBase *tmp = this;
     do
     {
         std::swap(tmp->next, tmp->prev);
@@ -2002,13 +2102,13 @@ List<T, Allocator>::iterator::iterator(NodeBase *x) :
 template<typename T, typename Allocator>
 typename List<T, Allocator>::iterator::reference List<T, Allocator>::iterator::operator*() const
 {
-    return static_cast<const Node *>(node)->data;
+    return static_cast<Node *>(node)->data;
 }
 
 template<typename T, typename Allocator>
 typename List<T, Allocator>::iterator::pointer List<T, Allocator>::iterator::operator->() const
 {
-    return std::addressof(static_cast<const Node *>(node)->data);
+    return &static_cast<Node *>(node)->data;
 }
 
 template<typename T, typename Allocator>
@@ -2090,7 +2190,7 @@ typename List<T, Allocator>::const_iterator::reference List<T, Allocator>::const
 template<typename T, typename Allocator>
 typename List<T, Allocator>::const_iterator::pointer List<T, Allocator>::const_iterator::operator->() const
 {
-    return std::addressof(static_cast<const Node *>(node)->data);
+    return &static_cast<const Node *>(node)->data;
 }
 
 template<typename T, typename Allocator>
