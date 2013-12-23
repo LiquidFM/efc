@@ -196,7 +196,7 @@ public:
 
         const NodeBase *node;
     };
-    
+
     typedef std::reverse_iterator<const_iterator>  const_reverse_iterator;
     typedef std::reverse_iterator<iterator>        reverse_iterator;
 
@@ -333,7 +333,7 @@ public:
      *  and that the resulting %List's size is the same as the number
      *  of elements assigned.  Old data may be lost.
      */
-    void assign(size_type n, const value_type &val);
+    WARN_UNUSED_RETURN bool assign(size_type n, const value_type &val);
 
     /**
      *  @brief  Assigns a range to a %List.
@@ -348,7 +348,7 @@ public:
      *  elements assigned.  Old data may be lost.
      */
     template<typename InputIterator>
-    void assign(InputIterator first, InputIterator last);
+    WARN_UNUSED_RETURN bool assign(InputIterator first, InputIterator last);
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
     /**
@@ -358,7 +358,7 @@ public:
      *  Replace the contents of the %List with copies of the elements
      *  in the initializer_list @a l.  This is linear in l.size().
      */
-    void assign(std::initializer_list<value_type> l);
+    WARN_UNUSED_RETURN bool assign(std::initializer_list<value_type> l);
 #endif
 
     // iterators
@@ -1069,14 +1069,14 @@ protected:
     // _GLIBCXX_RESOLVE_LIB_DEFECTS
     // 438. Ambiguity in the "do the right thing" clause
     template<typename Integer>
-    void assign_dispatch(Integer n, Integer val, bool_value<true>)
+    WARN_UNUSED_RETURN bool assign_dispatch(Integer n, Integer val, bool_value<true>)
     {
-        fill_assign(n, val);
+        return fill_assign(n, val);
     }
 
     // Called by the range assign to implement [23.1.1]/9
     template<typename InputIterator>
-    void assign_dispatch(InputIterator first, InputIterator last, bool_value<false>);
+    WARN_UNUSED_RETURN bool assign_dispatch(InputIterator first, InputIterator last, bool_value<false>);
 
     // Called by assign(n,t), and the range assign when it turns out
     // to be the same thing.
@@ -1263,25 +1263,25 @@ List<T, Allocator> &List<T, Allocator>::operator=(std::initializer_list<value_ty
 #endif
 
 template<typename T, typename Allocator>
-void List<T, Allocator>::assign(size_type n, const value_type &val)
+bool List<T, Allocator>::assign(size_type n, const value_type &val)
 {
-    fill_assign(n, val);
+    return fill_assign(n, val);
 }
 
 template<typename T, typename Allocator>
 template<typename InputIterator>
-void List<T, Allocator>::assign(InputIterator first, InputIterator last)
+bool List<T, Allocator>::assign(InputIterator first, InputIterator last)
 {
     // Check whether it's an integral type.  If so, it's not an iterator.
     typedef typename is_integer<InputIterator>::type Integral;
-    assign_dispatch(first, last, Integral());
+    return assign_dispatch(first, last, Integral());
 }
 
 #if PLATFORM_COMPILER_SUPPORTS(CXX11)
 template<typename T, typename Allocator>
-void List<T, Allocator>::assign(std::initializer_list<value_type> l)
+bool List<T, Allocator>::assign(std::initializer_list<value_type> l)
 {
-    assign(l.begin(), l.end());
+    return assign(l.begin(), l.end());
 }
 #endif
 
@@ -1988,6 +1988,24 @@ bool List<T, Allocator>::default_append(size_type n)
     }
 
     return true;
+}
+
+template<typename T, typename Allocator>
+template<typename InputIterator>
+bool List<T, Allocator>::assign_dispatch(InputIterator first2, InputIterator last2, bool_value<false>)
+{
+	iterator first1 = begin();
+	iterator last1 = end();
+
+	for (; first1 != last1 && first2 != last2; ++first1, ++first2)
+		*first1 = *first2;
+
+	if (first2 == last2)
+		erase(first1, last1);
+	else
+		return insert(last1, first2, last2);
+
+	return true;
 }
 
 template<typename T, typename Allocator>
