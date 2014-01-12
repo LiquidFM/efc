@@ -4,7 +4,7 @@ project (efc)
 project_cxx_library_header_default ()
 
 # 3rdparty
-list (APPEND ${PROJECT_NAME}_LIBS )
+list (APPEND ${PROJECT_NAME}_LIBS brolly)
 
 # Sources
 add_subdirectory (src)
