@@ -1,4 +1,4 @@
-/** @file the EFC library_staticlist.h
+/** @file efc_staticarray.h
  *  @brief TODO: Put description here.
  *
  * TODO: Put description here.
@@ -22,8 +22,8 @@
  * along with the EFC library. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef EFC_STATICLIST_H_
-#define EFC_STATICLIST_H_
+#ifndef EFC_STATICARRAY_H_
+#define EFC_STATICARRAY_H_
 
 #include <efc/List>
 
@@ -31,7 +31,7 @@
 namespace EFC {
 
 template <typename T, int Count>
-class StaticList
+class StaticArray
 {
 public:
     struct const_iterator
@@ -55,9 +55,9 @@ public:
         reference operator*() const { return m_field[m_pos % Count]; }
         pointer operator->() const { return m_field + (m_pos % Count); }
         const_iterator &operator++() { ++m_pos; return *this; }
-        const_iterator operator++(int) { ++m_pos; return *this; }
+        const_iterator operator++(int) { return ++const_iterator(*this); }
         const_iterator &operator--() { --m_pos; return *this; }
-        const_iterator operator--(int) { --m_pos; return *this; }
+        const_iterator operator--(int) { return --const_iterator(*this); }
         bool operator==(const const_iterator &x) const { return m_pos == x.m_pos; }
         bool operator!=(const const_iterator &x) const { return m_pos != x.m_pos; }
 
@@ -67,7 +67,7 @@ public:
     };
 
 public:
-    StaticList() :
+    StaticArray() :
         m_count(0)
     {}
 
@@ -83,4 +83,4 @@ private:
 
 }
 
-#endif /* EFC_STATICLIST_H_ */
+#endif /* EFC_STATICARRAY_H_ */
