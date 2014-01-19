@@ -26,6 +26,7 @@
 #define EFC_VARIANT_H_
 
 #include <cstdint>
+#include <cstddef>
 #include <efc/SharedPointer>
 
 
