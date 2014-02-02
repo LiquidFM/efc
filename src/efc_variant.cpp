@@ -25,8 +25,59 @@
 #include "efc_variant.h"
 
 #include <brolly/assert.h>
-#include <platform/platform.h>
+#include <platform/utils.h>
 #include <cstring>
+
+#if PLATFORM_OS(UNIX)
+#include <netinet/in.h>
+#elif PLATFORM_OS(WINDOWS)
+#include <WinSock.h>
+#endif
+
+
+namespace {
+
+inline uint64_t htonll(uint64_t value)
+{
+    return PLATFORM_MAKE_QWORD(htonl(PLATFORM_HI_DWORD(value)), htonl(PLATFORM_LO_DWORD(value)));
+}
+
+inline uint64_t ntohll(uint64_t value)
+{
+    return PLATFORM_MAKE_QWORD(ntohl(PLATFORM_HI_DWORD(value)), ntohl(PLATFORM_LO_DWORD(value)));
+}
+
+#if PLATFORM_COMPILER(GCC)
+    GCC_WARNING_OFF(strict-aliasing)
+#endif
+
+inline uint32_t htonf(float value)
+{
+    uint32_t r = *reinterpret_cast<uint32_t *>(&value);
+    return htonl(r);
+}
+
+inline float ntohf(uint32_t value)
+{
+    uint32_t r = ntohl(value);
+    return *reinterpret_cast<float *>(&r);
+}
+
+inline uint64_t htond(double value)
+{
+    uint64_t r = *reinterpret_cast<uint64_t *>(&value);
+    return htonll(r);
+}
+
+inline double ntohd(uint64_t value)
+{
+    uint64_t r = ntohll(value);
+    return *reinterpret_cast<double *>(&r);
+}
+
+#if PLATFORM_COMPILER(GCC)
+    GCC_WARNING_ON(strict-aliasing)
+#endif
 
 
 #if PLATFORM_CPU(LITTLE_ENDIAN)
@@ -42,6 +93,8 @@ enum
 #else
 #error This platform is not supported
 #endif
+}
+
 
 namespace EFC {
 
@@ -114,7 +167,16 @@ struct Variant::Private
         data()
     {
         ::memcpy(data.string_value.value, value, size);
-        data.string_value.value[data.string_value.size = size] = 0;
+        data.string_value.size = size;
+    }
+
+    Private(const char *value, size_t size, bool) :
+        type(STRING),
+        data()
+    {
+        ::memcpy(data.string_value.value, value, size);
+        data.string_value.value[size] = 0;
+        data.string_value.size = size + 1;
     }
 
     Private(const unsigned char *value, size_t size) :
@@ -237,7 +299,7 @@ Variant::Variant(const char *value)
     size_t len = ::strlen(value);
 
     if (byte_t *buffer = new (std::nothrow) byte_t [sizeof(Private) + len])
-        m_data.reset(new (buffer) Private(value, len));
+        m_data.reset(new (buffer) Private(value, len + 1));
 }
 
 Variant::Variant(const unsigned char *value, size_t size)
@@ -462,6 +524,318 @@ const unsigned char *Variant::asBinary(size_t &size) const
 void Variant::setBinary(const unsigned char *value, size_t size)
 {
     (*this) = Variant(value, size);
+}
+
+size_t Variant::serialize(unsigned char *buffer, size_t size) const
+{
+    if (!isValid())
+        return 0;
+    else
+    {
+        size_t minBufSize = Variant::size() + 1;
+
+        if (m_data->type == STRING || m_data->type == BINARY)
+            minBufSize += sizeof(uint32_t);
+
+        if (size >= minBufSize)
+        {
+            ASSERT(buffer != NULL);
+
+            *buffer = static_cast<uint8_t>(m_data->type);
+            ++buffer;
+
+            switch (m_data->type)
+            {
+                case UINT8:
+                case INT8:
+                case BOOL:
+                case CHAR:
+                    *buffer = m_data->data.uint_value.uint8_value[LoByte];
+                    break;
+
+                case UINT16:
+                case INT16:
+                    *reinterpret_cast<uint16_t *>(buffer) = htons(m_data->data.uint_value.uint16_value[LoWord]);
+                    break;
+
+                case UINT32:
+                case INT32:
+                    *reinterpret_cast<uint32_t *>(buffer) = htonl(m_data->data.uint_value.uint32_value[LoDWord]);
+                    break;
+
+                case UINT64:
+                case INT64:
+                    *reinterpret_cast<uint64_t *>(buffer) = htonll(m_data->data.uint_value.uint64_value);
+                    break;
+
+                case FLOAT:
+                    *reinterpret_cast<uint32_t *>(buffer) = htonf(m_data->data.float_value);
+                    break;
+
+                case DOUBLE:
+                    *reinterpret_cast<uint64_t *>(buffer) = htond(m_data->data.double_value);
+                    break;
+
+                case STRING:
+                case BINARY:
+                {
+                    *reinterpret_cast<uint32_t*>(buffer) = htonl(m_data->data.string_value.size);
+                    ::memcpy(buffer + sizeof(uint32_t), m_data->data.string_value.value, m_data->data.string_value.size);
+
+                    break;
+                }
+            }
+        }
+
+        return minBufSize;
+    }
+}
+
+size_t Variant::deserialize(const unsigned char *buffer, size_t size)
+{
+    if (buffer != NULL && size > 0)
+    {
+        Variant::Type type = static_cast<Variant::Type>(*buffer);
+        ++buffer;
+
+        switch (type)
+        {
+            case UINT8:
+            {
+                typedef uint8_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setUint8(static_cast<Type>(*buffer));
+                    size = sizeof(Type) + 1;
+                }
+
+                break;
+            }
+
+            case INT8:
+            {
+                typedef uint8_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setInt8(static_cast<Type>(*buffer));
+                    size = sizeof(Type) + 1;
+                }
+
+                break;
+            }
+
+            case UINT16:
+            {
+                typedef uint16_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setUint16(ntohs(*reinterpret_cast<const Type *>(buffer)));
+                    size = sizeof(Type) + 1;
+                }
+
+                break;
+            }
+
+            case INT16:
+            {
+                typedef int16_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setInt16(ntohs(*reinterpret_cast<const Type *>(buffer)));
+                    size = sizeof(Type) + 1;
+                }
+
+                break;
+            }
+
+            case UINT32:
+            {
+                typedef uint32_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setUint32(ntohl(*reinterpret_cast<const Type *>(buffer)));
+                    size = sizeof(Type) + 1;
+                }
+
+                break;
+            }
+
+            case INT32:
+            {
+                typedef int32_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setInt32(ntohl(*reinterpret_cast<const Type *>(buffer)));
+                    size = sizeof(Type) + 1;
+                }
+
+                break;
+            }
+
+            case UINT64:
+            {
+                typedef uint64_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setUint64(ntohll(*reinterpret_cast<const Type *>(buffer)));
+                    size = sizeof(Type) + 1;
+                }
+
+                break;
+            }
+
+            case INT64:
+            {
+                typedef int64_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setInt64(ntohll(*reinterpret_cast<const Type *>(buffer)));
+                    size = sizeof(Type) + 1;
+                }
+
+                break;
+            }
+
+            case FLOAT:
+            {
+                typedef uint32_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setFloat(ntohf(*reinterpret_cast<const Type *>(buffer)));
+                    size = sizeof(Type) + 1;
+                }
+
+                break;
+            }
+
+            case DOUBLE:
+            {
+                typedef uint64_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setDouble(ntohd(*reinterpret_cast<const Type *>(buffer)));
+                    size = sizeof(Type) + 1;
+                }
+                break;
+            }
+
+            case BOOL:
+            {
+                typedef bool Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setBool(*reinterpret_cast<const Type *>(buffer));
+                    size = sizeof(Type) + 1;
+                }
+
+                break;
+            }
+
+            case CHAR:
+            {
+                typedef char Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    setChar(*reinterpret_cast<const Type *>(buffer));
+                    size = sizeof(Type) + 1;
+                }
+
+                break;
+            }
+
+            case STRING:
+            {
+                typedef uint32_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    Type len = ntohl(*reinterpret_cast<const Type *>(buffer));
+
+                    if (len > 0 && len <= ((size - 1) - sizeof(Type)))
+                        setString(reinterpret_cast<const char *>(buffer + sizeof(Type)), len);
+
+                    size = sizeof(Type) + 1 + len;
+                }
+
+                break;
+            }
+
+            case BINARY:
+            {
+                typedef uint32_t Type;
+
+                if ((size - 1) < sizeof(Type))
+                    return 0;
+                else
+                {
+                    Type len = ntohl(*reinterpret_cast<const Type *>(buffer));
+
+                    if (len > 0 && len <= ((size - 1) - sizeof(Type)))
+                        setBinary(reinterpret_cast<const unsigned char *>(buffer + sizeof(Type)), len);
+
+                    size = sizeof(Type) + 1 + len;
+                }
+
+                break;
+            }
+        }
+
+        return size;
+    }
+
+    return 0;
+}
+
+void Variant::setString(const char *value, size_t size)
+{
+    if (value[size - 1] == 0)
+    {
+        if (byte_t *buffer = new (std::nothrow) byte_t [sizeof(Private) + size - 1])
+            m_data.reset(new (buffer) Private(value, size));
+    }
+    else
+    {
+        if (byte_t *buffer = new (std::nothrow) byte_t [sizeof(Private) + size])
+            m_data.reset(new (buffer) Private(value, size, true));
+    }
 }
 
 }

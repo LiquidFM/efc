@@ -124,6 +124,12 @@ public:
     const unsigned char *asBinary(size_t &size) const;
     void setBinary(const unsigned char *value, size_t size);
 
+    size_t serialize(unsigned char *buffer, size_t size) const;
+    size_t deserialize(const unsigned char *buffer, size_t size);
+
+private:
+    void setString(const char *value, size_t size);
+
 private:
     struct Private;
     SharedPointer<Private> m_data;
