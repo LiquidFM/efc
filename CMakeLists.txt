@@ -33,4 +33,8 @@ install_header_files (efc "src/efc_list.h:List"
                           "src/efc_memory.h:SharedPointer"
                           "src/efc_statemachine.h:StateMachine"
                           "src/efc_staticarray.h:StaticArray"
-                          "src/efc_variant.h:Variant")
+                          "src/efc_variant.h:Variant"
+                          "src/loki-0.1.7/NullType.h"
+                          "src/loki-0.1.7/Typelist.h"
+                          "src/loki-0.1.7/TypelistMacros.h"
+                          "src/loki-0.1.7/TypeManip.h")

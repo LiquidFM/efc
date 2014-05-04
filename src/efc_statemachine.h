@@ -26,7 +26,7 @@
 #define EFC_STATEMACHINE_H_
 
 #include <cstddef>
-#include "loki-0.1.7/Typelist.h"
+#include <efc/Typelist.h>
 
 
 #define RULE(FromState, Event, ToState, Context, ContextMethod) \
