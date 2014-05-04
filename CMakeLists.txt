@@ -18,3 +18,19 @@ build_version_file (efc 0.0.1)
 
 # Documentation
 add_documentation ("efc" 0.0.1 "Exceptions Free Containers library")
+
+# Install
+install_header_files (efc "src/efc_list.h:List"
+                          "src/efc_map.h:Map"
+                          "src/efc_set.h:Set"
+                          "src/efc_string.h:String"
+                          "src/efc_type_traits.h:type_traits"
+                          "src/efc_vector.h:Vector"
+                          "src/atomics/efc_atomics.h:Atomics"
+                          "src/efc_holder.h:Holder"
+                          "src/efc_pair.h:Pair"
+                          "src/efc_memory.h:ScopedPointer"
+                          "src/efc_memory.h:SharedPointer"
+                          "src/efc_statemachine.h:StateMachine"
+                          "src/efc_staticarray.h:StaticArray"
+                          "src/efc_variant.h:Variant")
