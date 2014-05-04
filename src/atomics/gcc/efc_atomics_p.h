@@ -292,7 +292,7 @@ void *cmpxchg_ptr(volatile void **ptr, void *old_val, void *new_val)
 
 int atomic_read(const atomic_t *v)
 {
-	return (*(__volatile__ int *)&(v)->counter);
+	return (*(const __volatile__ int *)&(v)->counter);
 }
 
 void atomic_write(atomic_t *v, int i)
