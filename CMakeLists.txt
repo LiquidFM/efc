@@ -19,7 +19,7 @@ build_version_file (efc 0.0.1)
 # Documentation
 add_documentation ("efc" 0.0.1 "Exceptions Free Containers library")
 
-# Install
+# Install rules
 install_header_files (efc "src/efc_list.h:List"
                           "src/efc_map.h:Map"
                           "src/efc_set.h:Set"
@@ -38,3 +38,4 @@ install_header_files (efc "src/efc_list.h:List"
                           "src/loki-0.1.7/Typelist.h"
                           "src/loki-0.1.7/TypelistMacros.h"
                           "src/loki-0.1.7/TypeManip.h")
+install_target (efc)
