@@ -37,5 +37,14 @@ install_header_files (efc "src/efc_list.h:List"
                           "src/loki-0.1.7/NullType.h"
                           "src/loki-0.1.7/Typelist.h"
                           "src/loki-0.1.7/TypelistMacros.h"
-                          "src/loki-0.1.7/TypeManip.h")
+                          "src/loki-0.1.7/TypeManip.h"
+                          "src/tasks/efc_task.h:Task"
+                          "src/tasks/efc_taskspool.h:TasksPool"
+                          "src/threads/efc_futex.h:Futex"
+                          "src/threads/efc_mutex.h:Mutex"
+                          "src/threads/efc_process.h:Process"
+                          "src/threads/efc_thread.h:Thread"
+                          "src/threads/efc_threads_common.h:threads_common.h"
+                          "src/threads/efc_tlsvalue.h:TlsValue"
+                          "src/threads/efc_waitcondition.h:WaitCondition")
 install_target (efc)
