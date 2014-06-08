@@ -134,8 +134,7 @@ template <typename T>
 Holder<T>::Holder(This &&other) :
     m_data(other.m_data)
 {
-    if (m_data)
-        atomic_inc(&m_data->ref);
+    other.m_data = NULL;
 }
 
 template <typename T>
@@ -144,8 +143,8 @@ typename Holder<T>::This &Holder<T>::operator=(This &&other)
     if (m_data && atomic_dec_and_test(&m_data->ref))
         m_data->deallocate();
 
-    if (m_data = other.m_data)
-        atomic_inc(&m_data->ref);
+    m_data = other.m_data;
+    other.m_data = NULL;
 
     return *this;
 }
