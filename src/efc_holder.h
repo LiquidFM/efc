@@ -237,7 +237,7 @@ bool Holder<T>::isValid() const
 template <typename T>
 bool Holder<T>::isUnique() const
 {
-    return atomic_read(&m_data->ref) == 1;
+    return !m_data || atomic_read(&m_data->ref) == 1;
 }
 
 template <typename T> template <typename R> inline
