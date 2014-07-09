@@ -47,6 +47,8 @@ public:
 
     ~Holder();
 
+    inline static Holder<T> fromRawData(T *data);
+
     inline bool operator<(const This &other) const;
     inline bool operator==(const This &other) const;
     inline bool operator!=(const This &other) const;
@@ -90,6 +92,9 @@ public:
         friend class Holder<T>;
         atomic_t ref;
     };
+
+private:
+    inline explicit Holder(Data *data);
 
 private:
     Data *m_data;
@@ -155,6 +160,12 @@ Holder<T>::~Holder()
 {
     if (m_data && atomic_dec_and_test(&m_data->ref))
         m_data->deallocate();
+}
+
+template <typename T>
+Holder<T> Holder<T>::fromRawData(T *data)
+{
+    return Holder<T>(static_cast<Data *>(data));
 }
 
 template <typename T>
@@ -250,6 +261,14 @@ template <typename T> template <typename R> inline
 const R *Holder<T>::as_const() const
 {
     return static_cast<const R *>(m_data);
+}
+
+template <typename T>
+Holder<T>::Holder(Data *data) :
+    m_data(data)
+{
+    if (m_data)
+        atomic_inc(&m_data->ref);
 }
 
 }
