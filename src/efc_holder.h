@@ -125,6 +125,9 @@ Holder<T>::Holder(const This &other) :
 template <typename T>
 typename Holder<T>::This &Holder<T>::operator=(const This &other)
 {
+    if (&m_data == &other.m_data)
+        return *this;
+
     if (m_data && atomic_dec_and_test(&m_data->ref))
         m_data->deallocate();
 
@@ -145,6 +148,9 @@ Holder<T>::Holder(This &&other) :
 template <typename T>
 typename Holder<T>::This &Holder<T>::operator=(This &&other)
 {
+    if (&m_data == &other.m_data)
+        return *this;
+
     if (m_data && atomic_dec_and_test(&m_data->ref))
         m_data->deallocate();
 
