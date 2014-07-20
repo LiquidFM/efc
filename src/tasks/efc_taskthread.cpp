@@ -52,6 +52,7 @@ TaskThread::~TaskThread()
 	if (m_handler.isRunning())
 	{
 		m_abort = true;
+		m_condition.wakeAll();
 		m_handler.waitForStop();
 	}
 }
