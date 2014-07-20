@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <platform/utils.h>
 #include <efc/Atomics>
+#include <brolly/assert.h>
 
 
 namespace EFC {
@@ -274,7 +275,10 @@ Holder<T>::Holder(Data *data) :
     m_data(data)
 {
     if (m_data)
+    {
+        ASSERT(m_data->ref.counter > 0);
         atomic_inc(&m_data->ref);
+    }
 }
 
 }
