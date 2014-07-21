@@ -62,9 +62,6 @@ public:
     void reset(T *data = NULL);
     inline This &operator=(T *data);
 
-    inline operator const T *() const;
-    inline operator T *();
-
     bool isValid() const;
     bool isUnique() const;
 
@@ -232,18 +229,6 @@ typename Holder<T>::This &Holder<T>::operator=(T *data)
 {
     reset(data);
     return *this;
-}
-
-template <typename T>
-Holder<T>::operator const T *() const
-{
-    return as_const<T>();
-}
-
-template <typename T>
-Holder<T>::operator T *()
-{
-    return as<T>();
 }
 
 template <typename T>
