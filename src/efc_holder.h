@@ -83,8 +83,10 @@ public:
         virtual ~Data()
         {}
 
-        static inline void destroy(T *data) { data->~T(); }
+        inline bool isUnique() const { return atomic_read(&ref) == 1; }
         virtual void deallocate() { delete this; }
+
+        static inline void destroy(T *data) { data->~T(); }
 
     private:
         friend class Holder<T>;
