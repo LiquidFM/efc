@@ -20,6 +20,7 @@
 #ifndef EFC_TASKSPOOL_H_
 #define EFC_TASKSPOOL_H_
 
+#include <efc/Map>
 #include <efc/List>
 #include <efc/Task>
 #include <efc/Futex>
@@ -36,21 +37,24 @@ public:
 	bool haveFreeThreads() const;
 	void handleImmediately(Task::Holder &task);
 	void handle(Task::Holder &task);
+    void cancel(const Task *task);
 	void clear();
 
 protected:
 	friend class TaskThread;
-	void nextTask(TaskThread *thread, Task::Holder &task);
+	void nextTask(TaskThread *thread, Task *&task);
 
 private:
-	typedef List<Task *>       Tasks;
-	typedef List<TaskThread *> Threads;
+	typedef List<Task *>                    Tasks;
+	typedef List<TaskThread *>              Threads;
+    typedef Map<const Task *, TaskThread *> BusyThreads;
 
 private:
 	mutable Futex m_futex;
 	Tasks m_tasks;
 	Threads m_threads;
 	Threads m_freeThreads;
+	BusyThreads m_busyThreads;
 	const Threads::size_type m_maxThreads;
 };
 

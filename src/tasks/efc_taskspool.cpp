@@ -52,24 +52,30 @@ void TasksPool::handleImmediately(Task::Holder &task)
 
 	if (!m_freeThreads.empty())
 	{
-		m_freeThreads.front()->handle(task);
-		m_freeThreads.pop_front();
-	}
+        m_busyThreads[task.get()] = m_freeThreads.front();
+        m_freeThreads.front()->handle(task.release());
+        m_freeThreads.pop_front();
+    }
 	else
 	{
 		if (m_threads.size() < m_maxThreads)
 		{
-			ScopedPointer<TaskThread> thread(new (std::nothrow) TaskThread(this, task));
+		    bool valid = true;
+		    ScopedPointer<TaskThread> thread(new (std::nothrow) TaskThread(this, task.get(), valid));
 
-			if (LIKELY(thread != NULL))
-				if (LIKELY(thread->isValid() == true))
-				{
-					m_threads.push_back(thread.release());
-					return;
-				}
-		}
+            if (LIKELY(thread != NULL))
+                if (LIKELY(valid == true))
+                {
+                    m_busyThreads[task.get()] = thread.get();
+                    m_threads.push_back(thread.get());
+                    thread.release();
+                    task.release();
+                    return;
+                }
+        }
 
-		m_tasks.push_front(task.release());
+		m_tasks.push_front(task.get());
+		task.release();
 	}
 }
 
@@ -79,25 +85,40 @@ void TasksPool::handle(Task::Holder &task)
 
 	if (!m_freeThreads.empty())
 	{
-		m_freeThreads.front()->handle(task);
+	    m_busyThreads[task.get()] = m_freeThreads.front();
+		m_freeThreads.front()->handle(task.release());
 		m_freeThreads.pop_front();
 	}
 	else
 	{
 		if (m_threads.size() < m_maxThreads)
 		{
-			ScopedPointer<TaskThread> thread(new (std::nothrow) TaskThread(this, task));
+            bool valid = true;
+			ScopedPointer<TaskThread> thread(new (std::nothrow) TaskThread(this, task.get(), valid));
 
 			if (LIKELY(thread != NULL))
-				if (LIKELY(thread->isValid() == true))
+				if (LIKELY(valid == true))
 				{
-					m_threads.push_back(thread.release());
+			        m_busyThreads[task.get()] = thread.get();
+					m_threads.push_back(thread.get());
+					thread.release();
+					task.release();
 					return;
 				}
 		}
 
-		m_tasks.push_back(task.release());
+		m_tasks.push_back(task.get());
+		task.release();
 	}
+}
+
+void TasksPool::cancel(const Task *task)
+{
+    Futex::Locker lock(m_futex);
+    BusyThreads::const_iterator i = m_busyThreads.find(task);
+
+    if (i != m_busyThreads.end())
+        i->second->cancel();
 }
 
 void TasksPool::clear()
@@ -108,15 +129,19 @@ void TasksPool::clear()
 		delete (*i);
 }
 
-void TasksPool::nextTask(TaskThread *thread, Task::Holder &task)
+void TasksPool::nextTask(TaskThread *thread, Task *&task)
 {
 	Futex::Locker lock(m_futex);
+	m_busyThreads.erase(task);
 
 	if (m_tasks.empty())
+	{
+	    task = NULL;
 		m_freeThreads.push_back(thread);
+	}
 	else
 	{
-		task.reset(m_tasks.front());
+        m_busyThreads[task = m_tasks.front()] = thread;
 		m_tasks.pop_front();
 	}
 }

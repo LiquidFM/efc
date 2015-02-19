@@ -31,20 +31,20 @@ class TasksPool;
 class PLATFORM_MAKE_PRIVATE TaskThread : public Thread
 {
 public:
-    TaskThread(TasksPool *pool, Task::Holder &task);
+    TaskThread(TasksPool *pool, Task *task, bool &vaild);
     virtual ~TaskThread();
 
-    bool isValid() const { return m_vaild; }
-    void handle(Task::Holder &task);
+    void handle(Task *task);
+    void cancel();
 
 protected:
     virtual void run();
 
 private:
-    bool m_vaild;
     bool m_abort;
+    bool m_cancel;
+    Task *m_task;
     TasksPool *m_pool;
-    Task::Holder m_task;
     WaitCondition m_condition;
     StartStopHandler m_handler;
 };

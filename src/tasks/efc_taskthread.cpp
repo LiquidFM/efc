@@ -25,24 +25,22 @@
 
 namespace EFC {
 
-TaskThread::TaskThread(TasksPool *pool, Task::Holder &task) :
+TaskThread::TaskThread(TasksPool *pool, Task *task, bool &vaild) :
 	Thread(),
-    m_vaild(true),
     m_abort(false),
+    m_cancel(false),
+    m_task(task),
 	m_pool(pool)
 {
-	ASSERT(task != NULL);
+	ASSERT(m_task != NULL);
 	ASSERT(m_pool != NULL);
 
 	Mutex::Locker lock(m_handler.mutex());
 
 	if (LIKELY(start() == NoError))
-	{
-		m_task = std::move(task);
 		m_handler.waitForStart();
-	}
 	else
-		m_vaild = false;
+		vaild = false;
 }
 
 TaskThread::~TaskThread()
@@ -52,16 +50,23 @@ TaskThread::~TaskThread()
 	if (m_handler.isRunning())
 	{
 		m_abort = true;
+	    m_cancel = true;
 		m_condition.wakeAll();
 		m_handler.waitForStop();
 	}
 }
 
-void TaskThread::handle(Task::Holder &task)
+void TaskThread::handle(Task *task)
 {
 	Mutex::Locker lock(m_handler.mutex());
-	m_task = std::move(task);
+	m_task = task;
     m_condition.wakeOne();
+}
+
+void TaskThread::cancel()
+{
+    Mutex::Locker lock(m_handler.mutex());
+    m_cancel = true;
 }
 
 void TaskThread::run()
@@ -70,7 +75,7 @@ void TaskThread::run()
 	m_handler.signalStarted();
 
     for (;;)
-		if (m_task.get() == NULL)
+		if (m_task == NULL)
 		{
 			m_condition.wait(m_handler.mutex());
 
@@ -79,20 +84,22 @@ void TaskThread::run()
 		}
 		else
 		{
-			ScopedPointer<Task> task(std::move(m_task));
+			ScopedPointer<Task> task(m_task);
+	        m_cancel = false;
 
 			PLATFORM_TRY
 			{
 				Mutex::Unlocker unlock(lock);
-				task->run(m_abort);
+
+				task->run(m_cancel);
+
+	            if (m_abort)
+	                break;
+	            else
+	                m_pool->nextTask(this, m_task);
 			}
 			PLATFORM_CATCH(...)
 			{}
-
-			if (m_abort)
-				break;
-			else
-				m_pool->nextTask(this, m_task);
 		}
 
 	m_handler.signalStopped();

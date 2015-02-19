@@ -41,7 +41,7 @@ public:
 
 protected:
 	friend class TaskThread;
-	virtual void run(const volatile bool &terminate) = 0;
+	virtual void run(volatile bool &terminate) = 0;
 };
 
 }
