@@ -35,7 +35,7 @@ public:
     virtual ~TaskThread();
 
     void handle(Task *task);
-    void cancel();
+    void cancel(bool wait);
 
 protected:
     virtual void run();

@@ -63,10 +63,13 @@ void TaskThread::handle(Task *task)
     m_condition.wakeOne();
 }
 
-void TaskThread::cancel()
+void TaskThread::cancel(bool wait)
 {
     Mutex::Locker lock(m_handler.mutex());
     m_cancel = true;
+
+    if (wait)
+        m_condition.wait(m_handler.mutex());
 }
 
 void TaskThread::run()
@@ -96,7 +99,12 @@ void TaskThread::run()
 	            if (m_abort)
 	                break;
 	            else
+	            {
+	                if (m_cancel)
+	                    m_condition.wakeAll();
+
 	                m_pool->nextTask(this, m_task);
+	            }
 			}
 			PLATFORM_CATCH(...)
 			{}

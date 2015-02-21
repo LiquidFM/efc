@@ -37,7 +37,7 @@ public:
 	bool haveFreeThreads() const;
 	void handleImmediately(Task::Holder &task);
 	void handle(Task::Holder &task);
-    void cancel(const Task *task);
+    void cancel(const Task *task, bool wait);
 	void clear();
 
 protected:

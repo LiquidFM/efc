@@ -112,13 +112,18 @@ void TasksPool::handle(Task::Holder &task)
 	}
 }
 
-void TasksPool::cancel(const Task *task)
+void TasksPool::cancel(const Task *task, bool wait)
 {
     Futex::Locker lock(m_futex);
     BusyThreads::const_iterator i = m_busyThreads.find(task);
 
     if (i != m_busyThreads.end())
-        i->second->cancel();
+    {
+        i->second->cancel(wait);
+
+        if (wait)
+            m_busyThreads.erase(i);
+    }
 }
 
 void TasksPool::clear()
