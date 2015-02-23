@@ -25,32 +25,33 @@
 
 namespace EFC {
 
-/* TODO(Vilkov): We should use a static allocator for threads lists. */
 WARN_UNUSED_RETURN_OFF
 
 TasksPool::TasksPool(int maxThreads) :
+    m_terminated(false),
 	m_maxThreads(maxThreads)
 {}
 
 TasksPool::~TasksPool()
 {
-	clear();
-
-	for (Threads::iterator i = m_threads.begin(), end = m_threads.end(); i != end; i = m_threads.erase(i))
-		delete (*i);
+    if (!m_terminated)
+        terminate();
 }
 
 bool TasksPool::haveFreeThreads() const
 {
     Futex::Locker lock(m_futex);
-    return !m_freeThreads.empty() || m_threads.size() < m_maxThreads;
+    return !m_terminated && (!m_freeThreads.empty() || m_threads.size() < m_maxThreads);
 }
 
-void TasksPool::handleImmediately(Task::Holder &task)
+bool TasksPool::handleImmediately(Task::Holder &task)
 {
 	Futex::Locker lock(m_futex);
 
-	if (!m_freeThreads.empty())
+    if (m_terminated)
+        return false;
+
+    if (!m_freeThreads.empty())
 	{
         m_busyThreads[task.get()] = m_freeThreads.front();
         m_freeThreads.front()->handle(task.release());
@@ -70,18 +71,23 @@ void TasksPool::handleImmediately(Task::Holder &task)
                     m_threads.push_back(thread.get());
                     thread.release();
                     task.release();
-                    return;
+                    return true;
                 }
         }
 
 		m_tasks.push_front(task.get());
 		task.release();
 	}
+
+    return true;
 }
 
-void TasksPool::handle(Task::Holder &task)
+bool TasksPool::handle(Task::Holder &task)
 {
 	Futex::Locker lock(m_futex);
+
+	if (m_terminated)
+	    return false;
 
 	if (!m_freeThreads.empty())
 	{
@@ -103,13 +109,15 @@ void TasksPool::handle(Task::Holder &task)
 					m_threads.push_back(thread.get());
 					thread.release();
 					task.release();
-					return;
+					return true;
 				}
 		}
 
 		m_tasks.push_back(task.get());
 		task.release();
 	}
+
+	return true;
 }
 
 void TasksPool::cancel(const Task *task, bool wait)
@@ -126,12 +134,19 @@ void TasksPool::cancel(const Task *task, bool wait)
     }
 }
 
-void TasksPool::clear()
+void TasksPool::terminate()
 {
-	Futex::Locker lock(m_futex);
+    Futex::Locker lock(m_futex);
 
-	for (Tasks::iterator i = m_tasks.begin(), end = m_tasks.end(); i != end; i = m_tasks.erase(i))
-		delete (*i);
+    m_terminated = true;
+
+    for (Tasks::iterator i = m_tasks.begin(); i != m_tasks.end(); i = m_tasks.erase(i))
+        delete (*i);
+
+    m_busyThreads.clear();
+
+    for (Threads::iterator i = m_threads.begin(); i != m_threads.end(); i = m_threads.erase(i))
+        delete (*i);
 }
 
 void TasksPool::nextTask(TaskThread *thread, Task *&task)

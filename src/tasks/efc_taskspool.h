@@ -34,11 +34,11 @@ public:
 	TasksPool(int maxThreads);
 	~TasksPool();
 
-	bool haveFreeThreads() const;
-	void handleImmediately(Task::Holder &task);
-	void handle(Task::Holder &task);
+	WARN_UNUSED_RETURN bool haveFreeThreads() const;
+	WARN_UNUSED_RETURN bool handleImmediately(Task::Holder &task);
+	WARN_UNUSED_RETURN bool handle(Task::Holder &task);
     void cancel(const Task *task, bool wait);
-	void clear();
+	void terminate();
 
 protected:
 	friend class TaskThread;
@@ -50,6 +50,7 @@ private:
     typedef Map<const Task *, TaskThread *> BusyThreads;
 
 private:
+	bool m_terminated;
 	mutable Futex m_futex;
 	Tasks m_tasks;
 	Threads m_threads;
