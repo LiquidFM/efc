@@ -24,61 +24,18 @@
 
 #include "efc_variant.h"
 
+#include <efc/network/byteorder.h>
 #include <brolly/assert.h>
-#include <platform/utils.h>
 #include <cstring>
 
 #if PLATFORM_OS(UNIX)
 #include <netinet/in.h>
 #elif PLATFORM_OS(WINDOWS)
-#include <WinSock.h>
+#include <winsock.h>
 #endif
 
 
 namespace {
-
-inline uint64_t htonll(uint64_t value)
-{
-    return PLATFORM_MAKE_QWORD(htonl(PLATFORM_HI_DWORD(value)), htonl(PLATFORM_LO_DWORD(value)));
-}
-
-inline uint64_t ntohll(uint64_t value)
-{
-    return PLATFORM_MAKE_QWORD(ntohl(PLATFORM_HI_DWORD(value)), ntohl(PLATFORM_LO_DWORD(value)));
-}
-
-#if PLATFORM_COMPILER(GCC)
-    GCC_WARNING_OFF(strict-aliasing)
-#endif
-
-inline uint32_t htonf(float value)
-{
-    uint32_t r = *reinterpret_cast<uint32_t *>(&value);
-    return htonl(r);
-}
-
-inline float ntohf(uint32_t value)
-{
-    uint32_t r = ntohl(value);
-    return *reinterpret_cast<float *>(&r);
-}
-
-inline uint64_t htond(double value)
-{
-    uint64_t r = *reinterpret_cast<uint64_t *>(&value);
-    return htonll(r);
-}
-
-inline double ntohd(uint64_t value)
-{
-    uint64_t r = ntohll(value);
-    return *reinterpret_cast<double *>(&r);
-}
-
-#if PLATFORM_COMPILER(GCC)
-    GCC_WARNING_ON(strict-aliasing)
-#endif
-
 
 #if PLATFORM_CPU(LITTLE_ENDIAN)
 enum
@@ -88,7 +45,7 @@ enum
     LoDWord = 0,
     HiByte = sizeof(uint64_t) - 1,
     HiWord = sizeof(uint64_t) / sizeof(uint16_t) - 1,
-    HiDWord = sizeof(uint64_t) / sizeof(uint32_t) - 1,
+    HiDWord = sizeof(uint64_t) / sizeof(uint32_t) - 1
 };
 #else
 #error This platform is not supported

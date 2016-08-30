@@ -1,7 +1,7 @@
 project (efc)
 
 # Project header
-project_cxx_library_header_default ()
+project_static_library_header_default ()
 
 # 3rdparty
 list (APPEND ${PROJECT_NAME}_LIBS platform brolly)
@@ -13,14 +13,12 @@ add_subdirectory (src)
 add_library (efc STATIC ${${PROJECT_NAME}_SOURCES})
 target_link_libraries (efc ${${PROJECT_NAME}_LIBS})
 
-# Version
-build_version_file (efc 0.0.1)
-
 # Documentation
 add_documentation ("efc" 0.0.1 "Exceptions Free Containers library")
 
 # Install rules
-install_header_files (efc "src/efc_list.h:List"
+install_header_files (efc "src/efc_move.h:move"
+                          "src/efc_list.h:List"
                           "src/efc_map.h:Map"
                           "src/efc_set.h:Set"
                           "src/efc_string.h:String"
@@ -46,5 +44,18 @@ install_header_files (efc "src/efc_list.h:List"
                           "src/threads/efc_thread.h:Thread"
                           "src/threads/efc_threads_common.h:threads_common.h"
                           "src/threads/efc_tlsvalue.h:TlsValue"
-                          "src/threads/efc_waitcondition.h:WaitCondition")
+                          "src/threads/efc_waitcondition.h:WaitCondition"
+                          "src/network/efc_byteorder.h:network/byteorder.h"
+                          "src/network/efc_socket.h:network/Socket"
+                          "src/network/efc_lasterror.h:network/LastError"
+                          "src/network/efc_connection.h:network/Connection"
+                          "src/network/efc_sender.h:network/Sender"
+                          "src/network/efc_receiver.h:network/Receiver"
+                          "src/network/efc_transport.h:network/Transport"
+                          "src/network/efc_clientsocket.h:network/ClientSocket"
+                          "src/network/efc_serversocket.h:network/ServerSocket"
+                          "src/network/efc_asynctransport.h:network/AsyncTransport"
+                          "src/network/efc_udpreceiver.h:network/UdpReceiver"
+                          "src/network/efc_udpsender.h:network/UdpSender"
+                          "src/network/efc_udpsocket.h:network/UdpSocket")
 install_target (efc)
