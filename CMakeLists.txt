@@ -12,7 +12,7 @@ target_link_libraries (efc brolly)
 add_dependencies (efc platform)
 
 # Documentation
-add_documentation ("efc" 0.0.1 "Exceptions Free Containers library")
+add_documentation (efc 0.0.1 "Exceptions Free Containers library")
 
 # Install rules
 install_header_files (efc "src/efc_move.h:move"
@@ -56,4 +56,5 @@ install_header_files (efc "src/efc_move.h:move"
                           "src/network/efc_udpreceiver.h:network/UdpReceiver"
                           "src/network/efc_udpsender.h:network/UdpSender"
                           "src/network/efc_udpsocket.h:network/UdpSocket")
+install_cmake_files ("cmake/FindEFC.cmake")
 install_target (efc)
