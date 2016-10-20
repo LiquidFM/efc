@@ -3,12 +3,15 @@ project (efc)
 # Project header
 project_header_default ("POSITION_INDEPENDENT_CODE:YES")
 
+# 3rdparty
+find_package (Threads REQUIRED)
+
 # Sources
 add_subdirectory (src)
 
 # Target
 add_library (efc STATIC ${${PROJECT_NAME}_SOURCES})
-target_link_libraries (efc brolly)
+target_link_libraries (efc brolly ${CMAKE_THREAD_LIBS_INIT})
 add_dependencies (efc platform)
 
 # Documentation
